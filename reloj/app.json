@@ -1,0 +1,59 @@
+{
+  "configVersion": "v3",
+  "app": {
+    "appId": 27247,
+    "appName": "Rutina Foto",
+    "appType": "app",
+    "version": {
+      "code": 1,
+      "name": "0.1.0"
+    },
+    "icon": "icon.png",
+    "vender": "Juanbagu",
+    "description": "Rutina desde una foto, guiada con los botones del reloj"
+  },
+  "permissions": [
+    "device:os.local_storage",
+    "data:user.hd.heart_rate"
+  ],
+  "runtime": {
+    "apiVersion": {
+      "compatible": "4.0",
+      "target": "4.0",
+      "minVersion": "4.0"
+    }
+  },
+  "targets": {
+    "default": {
+      "module": {
+        "page": {
+          "pages": [
+            "page/index",
+            "page/workout",
+            "page/keys"
+          ]
+        },
+        "app-side": {
+          "path": "app-side/index"
+        },
+        "setting": {
+          "path": "setting/index"
+        }
+      },
+      "platforms": [
+        {
+          "st": "s"
+        }
+      ]
+    }
+  },
+  "i18n": {
+    "es-ES": {
+      "appName": "Rutina Foto"
+    },
+    "en-US": {
+      "appName": "Rutina Foto"
+    }
+  },
+  "defaultLanguage": "es-ES"
+}

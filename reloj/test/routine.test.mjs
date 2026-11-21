@@ -102,3 +102,15 @@ test('descanso general y JSON', () => {
   assert.equal(j.exercises[0].name, 'A')
   assert.throws(() => parseRoutine('hola'))
 })
+
+test('el reloj entiende lo que genera la app del móvil (JSON y texto)', () => {
+  const desdeMovil = { name: 'Pierna', defaultRest: 90, exercises: [
+    { name: 'Sentadilla', sets: 4, reps: '10', weight: '60 kg', rest: 90 },
+    { name: 'Prensa', sets: 3, reps: '12', rest: 90, note: 'por pierna' }] }
+  const n = R.normalizeRoutine(desdeMovil)
+  assert.equal(n.exercises[1].weight, '')
+  assert.equal(n.exercises[1].note, 'por pierna')
+  const t = parseRoutine('Pierna\nSentadilla 4x10 60kg 90s\nPrensa 3x12 90s')
+  assert.deepEqual(t.exercises[0], { name: 'Sentadilla', sets: 4, reps: '10', weight: '60 kg', rest: 90 })
+  assert.deepEqual(t.exercises[1], { name: 'Prensa', sets: 3, reps: '12', rest: 90 })
+})

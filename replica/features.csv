@@ -1,0 +1,51 @@
+feature,area,priority,original,clone,notes
+Pedir y gestionar permisos de Health Connect,inicio,must,no,no,Zepp escribe en Health Connect; nosotros leemos
+Leer entrenos de Health Connect (cualquier reloj),entrenos,must,no,no,ExerciseSessionRecord con ruta y FC
+Evitar duplicados entre fuentes,entrenos,must,no,no,mismo entreno desde Zepp y otra app
+Historial de entrenos por semana/mes/todo,entrenos,must,yes,no,
+Filtrar historial por tipo de deporte,entrenos,must,yes,no,
+Detalle: resumen (tiempo distancia ritmo calorías FC),entrenos,must,yes,no,
+Detalle: mapa de la ruta,entrenos,must,yes,no,
+Detalle: gráficas de FC y ritmo,entrenos,must,yes,no,
+Detalle: zonas de frecuencia cardíaca,entrenos,should,yes,no,
+Detalle: parciales por km,entrenos,should,yes,no,
+Detalle: series de fuerza (ejercicio reps peso),entrenos,must,yes,no,
+Registrar entreno con el GPS del móvil,registro,must,yes,no,
+Pausa automática,registro,should,yes,no,
+Registro en segundo plano fiable,registro,must,yes,no,servicio en primer plano
+Añadir entreno a mano,registro,must,no,no,no confirmado en Zepp
+Añadir entreno desde foto de pantalla de máquina,foto,must,no,no,función nueva: cinta bici elíptica remo
+Añadir entreno desde captura de otra app,foto,should,no,no,función nueva
+Añadir fuerza desde rutina escrita (foto),foto,should,no,no,función nueva: series y repeticiones
+Revisar y corregir datos leídos de la foto,foto,must,no,no,campos dudosos marcados
+Guardar la foto junto al entreno,foto,could,no,no,
+Editar y borrar entrenos,entrenos,must,yes,no,
+Notas y sensación (RPE) en el entreno,entrenos,could,no,no,
+Plantillas de fuerza,fuerza,should,yes,no,sin el lío de intervalos que critica TechRadar
+Estadísticas semana/mes/año,progreso,must,yes,no,
+Estadísticas por deporte,progreso,should,yes,no,
+Récords personales,progreso,should,no,no,no confirmado en Zepp
+Aviso de récord nuevo,progreso,could,no,no,
+Objetivos diarios (pasos calorías minutos activos),objetivos,must,yes,no,Perfil > Mis objetivos
+Objetivos semanales y por deporte,objetivos,must,yes,no,
+Aviso al cumplir un objetivo,objetivos,must,yes,no,
+Rachas,objetivos,should,no,no,
+Retos personales con fecha límite,retos,must,yes,no,en Zepp son de la comunidad
+Insignias / logros,retos,should,yes,no,
+Escribir mis entrenos en Health Connect,integraciones,should,no,no,para que otras apps los vean
+Exportar GPX / CSV,integraciones,should,no,no,
+Perfil y zonas de FC,ajustes,must,yes,no,
+Unidades km/mi kg/lb,ajustes,could,yes,no,
+Puntuación de actividad propia,progreso,could,no,no,no PAI: fórmula y nombre propios
+Carga de entrenamiento propia,progreso,could,yes,no,TRIMP público; no la de Zepp
+Compartir entreno como imagen,entrenos,could,yes,no,
+Modo oscuro,ajustes,could,yes,no,
+Sincronizar directo con relojes Amazfit,dispositivo,skip,yes,no,protocolo Bluetooth privado
+Actualizar firmware y esferas / Zepp Store,dispositivo,skip,yes,no,propiedad de Zepp
+PAI,progreso,skip,yes,no,algoritmo y marca de Zepp
+Zepp Coach,entrenos,skip,yes,no,producto propio de Zepp; quizá un plan propio más adelante
+Zepp Aura (IA de bienestar),salud,skip,yes,no,de pago y propio
+Retos de comunidad con otros usuarios,retos,skip,yes,no,app personal sin red social
+Sueño estrés SpO2 corazón,salud,skip,yes,no,fuera de este alcance; se puede añadir después
+Nutrición por foto,salud,skip,yes,no,fuera de este alcance
+Strava sincronizado,integraciones,skip,yes,no,más adelante; Health Connect cubre lo básico

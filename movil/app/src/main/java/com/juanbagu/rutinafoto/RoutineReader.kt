@@ -51,7 +51,12 @@ object RoutineReader {
 
     fun read(ctx: Context, apiKey: String, image: Uri): Result {
         require(apiKey.isNotBlank()) { "Falta la clave de la API (Ajustes)" }
-        val jpeg = loadScaledJpeg(ctx, image)
+        val jpeg = try {
+            loadScaledJpeg(ctx, image)
+        } finally {
+            // La foto hecha con la cámara de la app se borra en cuanto se ha leído.
+            if (image.authority == "${ctx.packageName}.fotos") runCatching { ctx.contentResolver.delete(image, null, null) }
+        }
         val client = AnthropicOkHttpClient.builder().apiKey(apiKey).build()
         try {
             val params = MessageCreateParams.builder()

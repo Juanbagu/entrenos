@@ -40,6 +40,7 @@ class HealthWriter(private val ctx: Context) {
         val start = Instant.ofEpochMilli(s.start)
         val end = Instant.ofEpochMilli(s.end)
         val notes = buildString {
+            s.blocks.forEach { b -> append("▸ ").append(b.text()).appendLine() }
             s.exercises.forEach { e ->
                 append("• ").append(e.name).append(": ").append(e.detail())
                 if (e.hrAvg > 0) append(" · ♥").append(e.hrAvg)
@@ -53,7 +54,8 @@ class HealthWriter(private val ctx: Context) {
             startZoneOffset = zone.rules.getOffset(start),
             endTime = end,
             endZoneOffset = zone.rules.getOffset(end),
-            exerciseType = ExerciseSessionRecord.EXERCISE_TYPE_STRENGTH_TRAINING,
+            exerciseType = if (s.hybrid) ExerciseSessionRecord.EXERCISE_TYPE_HIGH_INTENSITY_INTERVAL_TRAINING
+            else ExerciseSessionRecord.EXERCISE_TYPE_STRENGTH_TRAINING,
             title = s.routine.take(100),
             notes = notes,
             metadata = Metadata.activelyRecorded(

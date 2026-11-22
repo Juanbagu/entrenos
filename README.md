@@ -50,15 +50,57 @@ Necesita una cuenta gratuita de desarrollador de Zepp (console.zepp.com, entrand
 La miniapp le pide la rutina a nuestra app a través de la app Zepp (servidor local `127.0.0.1:8765`). Si la app Zepp no lo permitiera:
 **Copiar como texto (para Zepp)** en el móvil → app Zepp → Perfil → Rutina Foto → Ajustes → pega en «Rutina». El reloj la lee de ahí.
 
-Formato de texto (también se puede escribir a mano):
+Formato de texto (también se puede escribir o pegar con el botón **Texto**):
 
 ```
-Pierna lunes
-Sentadilla 4x10 60kg 90s
-Press banca 3 x 12 @ 40 kg descanso 60
-Dominadas 3xmax
-Plancha 3x45s
+Híbrido jueves
+Back squat 5x5 100kg 2'
+
+4 rondas:
+1km run
+20 wall balls 9kg
+15 cal bike
+Descanso 1'
+
+21-15-9:
+Thrusters 43kg
+Pull-ups
+Time cap 10'
+
+AMRAP 12'
+10 burpees
+12 cal row
+6 pull ups
+
+E2MOM 16: 8 power cleans 70kg
 ```
+
+| se escribe | se entiende |
+| --- | --- |
+| `Sentadilla 4x10 60kg 90s` | fuerza: 4 series de 10 con 60 kg y 90 s de descanso |
+| `1km run`, `Row 1000m`, `50m sled push @ 152kg` | distancia (en metros) y peso |
+| `20 cal bike`, `15/12 cal AB` | calorías (si hay dos cifras, la primera) |
+| `Plancha 1:00`, `45s hollow`, `2' plank` | por tiempo (cuenta atrás en el reloj) |
+| `200m farmers carry 2x24kg`, `100 WB 6/4kg` | pesos dobles y hombre/mujer |
+| `4 rondas`, `5 RFT`, `x3` | rondas (RFT = cronometradas) |
+| `21-15-9`, `For time (cap 20)`, `Time cap 10'` | por tiempo con esquema y límite |
+| `AMRAP 12'` | tantas rondas como puedas; el reloj cuenta las rondas |
+| `EMOM 10`, `E2MOM 16`, `Cada 3' x 5` | cada minuto (o cada N); el reloj avanza solo |
+| `HYROX SIM` + estaciones | For time completo (8 × carrera + estación) |
+| WB, BBJ, SBL, FC, T2B, C2B, HSPU, DU, Ski, Row, Run, AB… | se traducen al nombre completo |
+
+### En el reloj, con bloques
+
+- **AMRAP / EMOM / For time** empiezan con **arriba** («¡Listo!») y muestran arriba el reloj del bloque: rondas y tiempo que queda (AMRAP), minuto e intervalo (EMOM) o tiempo transcurrido y límite (For time/Hyrox).
+- En el **EMOM**, al terminar el ejercicio pulsas arriba y esperas; al empezar el minuto vibra y pasa al siguiente. Si no te da tiempo, cuenta como no completado.
+- **Arriba largo** en un AMRAP/EMOM termina el bloque; en el resto, pasa al siguiente ejercicio.
+- El resumen guarda el resultado de cada bloque (rondas del AMRAP, tiempo del For time o del Hyrox, minutos fallados del EMOM) y en Health Connect se registra como entreno de intervalos (HIIT).
+
+### Lectura de fotos
+
+- **Captura** (o compartir una imagen con la app): se lee **en el móvil, sin internet y gratis**. Si no sale bien, «Leer con IA».
+- **Hacer foto** (pizarra, papel, letra a mano): se lee **con IA** si tienes clave; si no, en el móvil.
+- **Texto**: pega el entreno (de WhatsApp, notas…) y se lee en el móvil.
 
 ## Seguridad
 

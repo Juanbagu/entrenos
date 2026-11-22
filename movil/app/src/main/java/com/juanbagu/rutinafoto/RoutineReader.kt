@@ -31,23 +31,48 @@ object RoutineReader {
     const val MODEL = "claude-opus-5-5"
 
     private val SYSTEM = """
-        Eres un asistente que pasa a limpio rutinas de gimnasio a partir de una foto
-        (pizarra del gimnasio, papel escrito a mano o captura de pantalla de otra app).
-        Devuelve los ejercicios en el orden en que hay que hacerlos.
-        - name: el nombre del ejercicio como está escrito, corrigiendo solo faltas evidentes. En español si está en español.
-        - sets: número de series (entero). Si no se indica, 1.
-        - reps: repeticiones tal cual ("10", "8-10", "max", "45s" para tiempo). Vacío si no hay.
-        - weight: peso con unidad ("60 kg", "20 lb") o vacío.
-        - rest: descanso entre series en segundos, o null si la foto no lo dice.
-        - note: algo importante que no cabe en lo anterior (p. ej. "superserie con el siguiente", "por pierna"), o vacío.
-        Si hay superseries o circuitos, ponlos en orden y explícalo en note.
-        Si hay varios días o bloques, usa solo el que parezca el de hoy o el primero, y dilo en warnings.
+        Pasas a limpio entrenamientos a partir de una foto: pizarra del box o del gimnasio, papel escrito a mano
+        o captura de otra app. Los entrenamientos suelen ser HÍBRIDOS: carrera, remo, SkiErg, bici de aire
+        (Assault/Echo), trineo (sled push/pull), burpee broad jumps, farmers carry, sandbag lunges, wall balls,
+        dominadas, halterofilia (snatch, clean & jerk, power clean, thrusters), kettlebell, gimnásticos, y también
+        fuerza clásica (series × repeticiones).
+
+        Organiza el entreno en BLOQUES, en el orden en que se hacen:
+        - "sets": fuerza clásica, series × repeticiones con descanso (p. ej. "Back squat 5x5 100kg").
+        - "rounds": N rondas seguidas de los ejercicios del bloque (p. ej. "4 rondas:"). rounds = N.
+        - "fortime": por tiempo. Incluye Hyrox y simulaciones, "RFT", "For time", esquemas tipo 21-15-9
+          (rounds = número de rondas y scheme = "21-15-9"; deja reps vacío en los ejercicios que siguen el esquema).
+          capS = time cap en segundos si lo hay.
+        - "amrap": AMRAP de X minutos → capS = X*60. Los ejercicios del bloque se repiten en bucle.
+        - "emom": EMOM / E2MOM / "cada X' x N" → everyS = segundos de cada intervalo, capS = duración total en segundos.
+          Cada ejercicio del bloque ocupa un intervalo, en orden.
+        Cada ejercicio indica en "block" el índice (desde 0) del bloque al que pertenece.
+
+        Cada ejercicio:
+        - name: como está escrito, sin abreviaturas raras: WB → Wall balls, BBJ → Burpee broad jumps,
+          SBL → Sandbag lunges, FC → Farmers carry, T2B → Toes to bar, C2B → Chest to bar, HSPU → Handstand push-ups,
+          DU → Double unders, Ski → SkiErg, Row → Remo, Run → Carrera, AB/Assault/Echo → Air bike.
+        - reps: la META como texto: repeticiones "15", rango "8-10", "max", distancia en metros "1000 m"
+          (1 km = "1000 m"), calorías "20 cal", tiempo en segundos "45s" (1:00 = "60s").
+          Si hay dos cifras hombre/mujer (p. ej. "20/15 cal"), usa la primera.
+        - sets: número de series (fuerza) o repeticiones de ese ejercicio dentro del bloque; si no se indica, 1.
+        - weight: peso con unidad tal como aparece ("60 kg", "2×24 kg" para dos kettlebells/mancuernas, "6/4 kg"
+          si da peso masculino/femenino, "152 kg" del trineo). Vacío si no hay.
+        - rest: descanso entre series en segundos (solo fuerza), o null.
+        - note: algo importante que no encaja (p. ej. "superserie con el siguiente", "por pierna", "sin soltar"), o vacío.
+        En bloques "rounds"/"fortime" el descanso entre rondas va en restS del bloque.
+
+        Una simulación Hyrox estándar es un bloque "fortime" con 8 × (1000 m de carrera + estación) en este orden:
+        SkiErg 1000 m, Sled push 50 m, Sled pull 50 m, Burpee broad jumps 80 m, Remo 1000 m, Farmers carry 200 m,
+        Sandbag lunges 100 m, Wall balls 100. Si la foto pone algo como "8 × (1 km run + estación)", despliégalo así.
+
         name de la rutina: el título de la foto o uno corto que la describa.
         warnings: lo que no se lee bien o lo que has tenido que suponer. Vacío si todo está claro.
-        No inventes ejercicios que no estén en la imagen.
+        No inventes ejercicios que no estén en la imagen (salvo desplegar una notación como la de Hyrox).
     """.trimIndent()
 
-    data class Result(val routine: Routine, val warnings: List<String>)
+    /** offline = leído en el móvil sin IA; rawText = el texto reconocido (para depurar). */
+    data class Result(val routine: Routine, val warnings: List<String>, val offline: Boolean = false, val rawText: String = "")
 
     fun read(ctx: Context, apiKey: String, image: Uri): Result {
         require(apiKey.isNotBlank()) { "Falta la clave de la API (Ajustes)" }
@@ -128,27 +153,44 @@ object RoutineReader {
 
     private fun schema(): JsonOutputFormat.Schema {
         val str = mapOf("type" to "string")
+        val int = mapOf("type" to "integer")
         val exercise = mapOf(
             "type" to "object",
             "additionalProperties" to false,
-            "required" to listOf("name", "sets", "reps", "weight", "rest", "note"),
+            "required" to listOf("name", "sets", "reps", "weight", "rest", "note", "block"),
             "properties" to mapOf(
                 "name" to str,
-                "sets" to mapOf("type" to "integer"),
+                "sets" to int,
                 "reps" to str,
                 "weight" to str,
                 "rest" to mapOf("type" to listOf("integer", "null")),
                 "note" to str,
+                "block" to int,
+            ),
+        )
+        val block = mapOf(
+            "type" to "object",
+            "additionalProperties" to false,
+            "required" to listOf("name", "type", "rounds", "capS", "everyS", "restS", "scheme"),
+            "properties" to mapOf(
+                "name" to str,
+                "type" to mapOf("type" to "string", "enum" to BlockType.entries.map { it.id }),
+                "rounds" to int,
+                "capS" to int,
+                "everyS" to int,
+                "restS" to int,
+                "scheme" to str,
             ),
         )
         return JsonOutputFormat.Schema.builder()
             .putAdditionalProperty("type", JsonValue.from("object"))
             .putAdditionalProperty("additionalProperties", JsonValue.from(false))
-            .putAdditionalProperty("required", JsonValue.from(listOf("name", "exercises", "warnings")))
+            .putAdditionalProperty("required", JsonValue.from(listOf("name", "blocks", "exercises", "warnings")))
             .putAdditionalProperty(
                 "properties", JsonValue.from(
                     mapOf(
                         "name" to str,
+                        "blocks" to mapOf("type" to "array", "items" to block),
                         "exercises" to mapOf("type" to "array", "items" to exercise),
                         "warnings" to mapOf("type" to "array", "items" to str),
                     )

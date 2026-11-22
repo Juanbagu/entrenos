@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -107,27 +106,56 @@ private fun RoutineScreen(store: Store, sharedImage: MutableStateFlow<Uri?>) {
     var recent by remember { mutableStateOf(store.recent()) }
     LaunchedEffect(routine) { store.draft = routine }
     var warnings by remember { mutableStateOf<List<String>>(emptyList()) }
-    var busy by remember { mutableStateOf(false) }
+    var busy by remember { mutableStateOf<String?>(null) }
     var message by remember { mutableStateOf<String?>(null) }
+    var lastImage by remember { mutableStateOf<Uri?>(null) } // para «Leer con IA» si la lectura sin internet falla
+    var pasting by remember { mutableStateOf(false) }
     val bridgeOn by BridgeService.running.collectAsState()
     val shared by sharedImage.collectAsState()
+    val hasKey = store.apiKey.isNotBlank()
 
-    fun read(uri: Uri) {
-        busy = true
+    fun show(res: RoutineReader.Result) {
+        routine = res.routine
+        warnings = res.warnings
+        message = if (res.offline) "Leído en el móvil, sin internet y gratis. Revisa y pulsa «Enviar al reloj»." +
+            (if (hasKey) " Si algo está mal, «Leer con IA»." else "")
+        else "Leído con IA. Revisa y pulsa «Enviar al reloj»."
+    }
+
+    fun readAi(uri: Uri) {
+        if (!hasKey) { message = "Para leer con IA pon tu clave en Ajustes."; return }
+        busy = "Leyendo con IA…"
         message = null
         scope.launch {
             val r = withContext(Dispatchers.IO) { runCatching { RoutineReader.read(ctx, store.apiKey, uri) } }
-            busy = false
-            r.onSuccess { routine = it.routine; warnings = it.warnings; message = "Revisa la rutina y pulsa «Enviar al reloj»." }
-                .onFailure { message = "No he podido leer la foto: ${it.message}" }
+            busy = null
+            r.onSuccess { show(it); lastImage = null }.onFailure { message = "No he podido leer la imagen: ${it.message}" }
         }
     }
 
-    LaunchedEffect(shared) { shared?.let { read(it); sharedImage.value = null } }
+    // Capturas: primero en el móvil (gratis); si no sale nada útil y hay clave, con IA.
+    fun readOffline(uri: Uri, fallbackAi: Boolean) {
+        busy = "Leyendo en el móvil…"
+        message = null
+        lastImage = uri
+        scope.launch {
+            val r = withContext(Dispatchers.IO) { runCatching { OfflineReader.read(ctx, uri) } }
+            busy = null
+            r.onSuccess { show(it) }.onFailure {
+                if (fallbackAi && hasKey) readAi(uri)
+                else message = "No he sabido leerla sin internet (${it.message})." + if (hasKey) " Prueba «Leer con IA»." else " Pon tu clave de IA en Ajustes para pizarras y letra a mano."
+            }
+        }
+    }
+
+    LaunchedEffect(shared) { shared?.let { readOffline(it, fallbackAi = true); sharedImage.value = null } }
 
     var photoUri by remember { mutableStateOf<Uri?>(null) }
-    val takePhoto = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok -> if (ok) photoUri?.let { read(it) } }
-    val pick = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> uri?.let { read(it) } }
+    // Fotos de la cámara (pizarras, papel): con IA si hay clave; si no, en el móvil.
+    val takePhoto = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
+        if (ok) photoUri?.let { if (hasKey) readAi(it) else readOffline(it, fallbackAi = false) }
+    }
+    val pick = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> uri?.let { readOffline(it, fallbackAi = true) } }
     val notifPerm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
     fun sendToWatch() {
@@ -147,31 +175,43 @@ private fun RoutineScreen(store: Store, sharedImage: MutableStateFlow<Uri?>) {
         message = "Lista. En el reloj abre Rutina Foto y pulsa «Recibir del móvil» (con la app Zepp abierta en segundo plano)."
     }
 
+    if (pasting) PasteDialog(onDismiss = { pasting = false }) { text ->
+        runCatching { RoutineParser.parse(text).cleaned() }
+            .onSuccess { routine = it; warnings = emptyList(); message = "Texto leído. Revisa y pulsa «Enviar al reloj»."; pasting = false }
+            .onFailure { message = it.message }
+    }
+
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
             Spacer(Modifier.height(12.dp))
             Text("Rutina Foto", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Text("Haz una foto de la pizarra o comparte una captura.", style = MaterialTheme.typography.bodyMedium)
+            Text("Foto de la pizarra, captura o texto. Fuerza, híbridos y Hyrox.", style = MaterialTheme.typography.bodyMedium)
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(enabled = !busy, onClick = {
+                Button(enabled = busy == null, onClick = {
                     val f = File(ctx.cacheDir, "fotos").apply { mkdirs() }.let { File(it, "foto.jpg") }
                     photoUri = FileProvider.getUriForFile(ctx, "${ctx.packageName}.fotos", f)
                     takePhoto.launch(photoUri!!)
                 }) { Text("Hacer foto") }
-                OutlinedButton(enabled = !busy, onClick = {
+                OutlinedButton(enabled = busy == null, onClick = {
                     pick.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                }) { Text("Elegir imagen") }
+                }) { Text("Captura") }
+                OutlinedButton(enabled = busy == null, onClick = { pasting = true }) { Text("Texto") }
             }
-            if (busy) Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 12.dp)) {
-                CircularProgressIndicator(Modifier.size(24.dp)); Spacer(Modifier.width(12.dp)); Text("Leyendo la foto…")
+            busy?.let {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 12.dp)) {
+                    CircularProgressIndicator(Modifier.size(24.dp)); Spacer(Modifier.width(12.dp)); Text(it)
+                }
             }
             message?.let { Text(it, modifier = Modifier.padding(top = 8.dp), color = MaterialTheme.colorScheme.primary) }
+            if (lastImage != null && hasKey && busy == null) {
+                TextButton(onClick = { readAi(lastImage!!) }) { Text("Leer con IA") }
+            }
             if (recent.isNotEmpty()) {
                 Text("Recientes", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 10.dp))
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     recent.forEach { rr ->
-                        AssistChip(onClick = { routine = rr; warnings = emptyList(); message = "Cargada «${rr.name}». Revisa y envía." },
+                        AssistChip(onClick = { routine = rr; warnings = emptyList(); lastImage = null; message = "Cargada «${rr.name}». Revisa y envía." },
                             label = { Text(rr.name, maxLines = 1) })
                     }
                 }
@@ -190,20 +230,48 @@ private fun RoutineScreen(store: Store, sharedImage: MutableStateFlow<Uri?>) {
             item {
                 OutlinedTextField(r.name, { routine = r.copy(name = it) }, label = { Text("Nombre de la rutina") }, modifier = Modifier.fillMaxWidth())
             }
-            itemsIndexed(r.exercises) { i, e ->
-                ExerciseCard(i, e, onChange = { ne -> routine = r.copy(exercises = r.exercises.toMutableList().also { it[i] = ne }) },
-                    onDelete = { routine = r.copy(exercises = r.exercises.toMutableList().also { it.removeAt(i) }) })
+            // Un encabezado por bloque y sus ejercicios; botón para añadir al final de cada bloque.
+            val blocks = r.blocks.ifEmpty { listOf(Block()) }
+            blocks.forEachIndexed { bi, b ->
+                val idxs = r.exercises.indices.filter { r.exercises[it].block == bi }
+                if (idxs.isEmpty() && blocks.size > 1) return@forEachIndexed
+                item(key = "b$bi") {
+                    BlockHeader(b, showSimpleSets = blocks.size == 1) { nb -> routine = r.copy(blocks = blocks.toMutableList().also { it[bi] = nb }) }
+                }
+                idxs.forEachIndexed { n, i ->
+                    item(key = "e$i-${r.exercises.size}") {
+                        ExerciseCard(n, r.exercises[i], b.type,
+                            onChange = { ne -> routine = r.copy(exercises = r.exercises.toMutableList().also { it[i] = ne }) },
+                            onDelete = { routine = r.copy(exercises = r.exercises.toMutableList().also { it.removeAt(i) }) })
+                    }
+                }
+                item(key = "add$bi") {
+                    TextButton(onClick = {
+                        val at = (idxs.lastOrNull() ?: (r.exercises.size - 1)) + 1
+                        val ne = if (b.type == BlockType.SETS) Exercise("Nuevo ejercicio", 3, "10", block = bi) else Exercise("Nuevo ejercicio", 1, "10", block = bi)
+                        routine = r.copy(blocks = blocks, exercises = r.exercises.toMutableList().also { it.add(at.coerceIn(0, it.size), ne) })
+                    }) { Icon(Icons.Filled.Add, null); Spacer(Modifier.width(4.dp)); Text("Añadir ejercicio") }
+                }
             }
             item {
-                TextButton(onClick = { routine = r.copy(exercises = r.exercises + Exercise("Nuevo ejercicio", 3, "10")) }) {
-                    Icon(Icons.Filled.Add, null); Spacer(Modifier.width(4.dp)); Text("Añadir ejercicio")
+                AddBlockButton { type ->
+                    val nb = when (type) {
+                        BlockType.AMRAP -> Block("AMRAP 12'", type, capS = 720)
+                        BlockType.EMOM -> Block("EMOM 10'", type, capS = 600, everyS = 60)
+                        BlockType.ROUNDS -> Block("4 rondas", type, rounds = 4)
+                        BlockType.FORTIME -> Block("For time", type)
+                        BlockType.SETS -> Block("Fuerza", type)
+                    }
+                    val bi = blocks.size
+                    routine = r.copy(blocks = blocks + nb, exercises = r.exercises + Exercise("Nuevo ejercicio", if (type == BlockType.SETS) 3 else 1, "10", block = bi))
                 }
+                Spacer(Modifier.height(8.dp))
                 Button(onClick = { sendToWatch() }, enabled = r.exercises.isNotEmpty(), modifier = Modifier.fillMaxWidth().height(56.dp)) {
                     Text("Enviar al reloj", style = MaterialTheme.typography.titleMedium)
                 }
                 OutlinedButton(onClick = {
                     val cm = ctx.getSystemService(ClipboardManager::class.java)
-                    cm.setPrimaryClip(ClipData.newPlainText("Rutina", r.toText()))
+                    cm.setPrimaryClip(ClipData.newPlainText("Rutina", r.cleaned().toText()))
                     message = "Copiada. Si el reloj no la recibe: app Zepp → Rutina Foto → Ajustes → pega en «Rutina»."
                 }, modifier = Modifier.fillMaxWidth()) { Text("Copiar como texto (para Zepp)") }
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 8.dp)) {
@@ -217,7 +285,76 @@ private fun RoutineScreen(store: Store, sharedImage: MutableStateFlow<Uri?>) {
 }
 
 @Composable
-private fun ExerciseCard(i: Int, e: Exercise, onChange: (Exercise) -> Unit, onDelete: () -> Unit) {
+private fun PasteDialog(onDismiss: () -> Unit, onRead: (String) -> Unit) {
+    var text by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Pegar entreno") },
+        text = {
+            OutlinedTextField(text, { text = it }, minLines = 8, modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("4 rondas:\n1km run\n20 wall balls 9kg\n\nAMRAP 12'\n10 burpees\n15 cal bike") })
+        },
+        confirmButton = { TextButton(enabled = text.isNotBlank(), onClick = { onRead(text) }) { Text("Leer") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
+    )
+}
+
+@Composable
+private fun BlockHeader(b: Block, showSimpleSets: Boolean, onChange: (Block) -> Unit) {
+    if (b.type == BlockType.SETS && showSimpleSets && b.name.isBlank()) return
+    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                var open by remember { mutableStateOf(false) }
+                Box {
+                    AssistChip(onClick = { open = true }, label = { Text(b.type.label) })
+                    DropdownMenu(open, { open = false }) {
+                        BlockType.entries.forEach { t ->
+                            DropdownMenuItem(text = { Text(t.label) }, onClick = {
+                                open = false
+                                onChange(b.copy(type = t, capS = if ((t == BlockType.AMRAP || t == BlockType.EMOM) && b.capS == 0) 600 else b.capS))
+                            })
+                        }
+                    }
+                }
+                Spacer(Modifier.width(8.dp))
+                OutlinedTextField(b.name, { onChange(b.copy(name = it)) }, label = { Text("Bloque") }, singleLine = true, modifier = Modifier.weight(1f))
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                when (b.type) {
+                    BlockType.ROUNDS, BlockType.FORTIME -> {
+                        NumField("Rondas", b.rounds.toString(), Modifier.weight(1f)) { onChange(b.copy(rounds = it.toIntOrNull()?.coerceIn(1, 50) ?: b.rounds)) }
+                        if (b.type == BlockType.FORTIME) NumField("Cap min", if (b.capS > 0) (b.capS / 60).toString() else "", Modifier.weight(1f)) {
+                            onChange(b.copy(capS = (it.toIntOrNull() ?: 0) * 60))
+                        }
+                        NumField("Desc. ronda s", if (b.restS > 0) b.restS.toString() else "", Modifier.weight(1.2f)) { onChange(b.copy(restS = it.toIntOrNull() ?: 0)) }
+                    }
+                    BlockType.AMRAP -> NumField("Minutos", (b.capS / 60).toString(), Modifier.weight(1f)) { onChange(b.copy(capS = (it.toIntOrNull() ?: 0) * 60)) }
+                    BlockType.EMOM -> {
+                        NumField("Cada (min)", (b.everyS / 60).coerceAtLeast(1).toString(), Modifier.weight(1f)) { onChange(b.copy(everyS = ((it.toIntOrNull() ?: 1).coerceAtLeast(1)) * 60)) }
+                        NumField("Total min", (b.capS / 60).toString(), Modifier.weight(1f)) { onChange(b.copy(capS = (it.toIntOrNull() ?: 0) * 60)) }
+                    }
+                    BlockType.SETS -> Text("Series × repeticiones con descanso", style = MaterialTheme.typography.bodySmall)
+                }
+            }
+            if (b.scheme.isNotBlank()) Text("Repeticiones por ronda: ${b.scheme}", style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+@Composable
+private fun AddBlockButton(onAdd: (BlockType) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        OutlinedButton(onClick = { open = true }) { Icon(Icons.Filled.Add, null); Spacer(Modifier.width(4.dp)); Text("Añadir bloque") }
+        DropdownMenu(open, { open = false }) {
+            BlockType.entries.forEach { t -> DropdownMenuItem(text = { Text(t.label) }, onClick = { open = false; onAdd(t) }) }
+        }
+    }
+}
+
+@Composable
+private fun ExerciseCard(i: Int, e: Exercise, type: BlockType, onChange: (Exercise) -> Unit, onDelete: () -> Unit) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -227,10 +364,15 @@ private fun ExerciseCard(i: Int, e: Exercise, onChange: (Exercise) -> Unit, onDe
                 IconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, "Borrar") }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                NumField("Series", e.sets.toString(), Modifier.weight(1f)) { onChange(e.copy(sets = it.toIntOrNull()?.coerceIn(1, 20) ?: e.sets)) }
-                OutlinedTextField(e.reps, { onChange(e.copy(reps = it)) }, label = { Text("Reps") }, singleLine = true, modifier = Modifier.weight(1f))
-                OutlinedTextField(e.weight, { onChange(e.copy(weight = it)) }, label = { Text("Peso") }, singleLine = true, modifier = Modifier.weight(1.2f))
-                NumField("Desc. s", e.rest?.toString() ?: "", Modifier.weight(1f)) { onChange(e.copy(rest = it.toIntOrNull())) }
+                if (type == BlockType.SETS) {
+                    NumField("Series", e.sets.toString(), Modifier.weight(0.8f)) { onChange(e.copy(sets = it.toIntOrNull()?.coerceIn(1, 20) ?: e.sets)) }
+                }
+                OutlinedTextField(e.reps, { onChange(e.copy(reps = it)) }, label = { Text("Meta") }, singleLine = true,
+                    placeholder = { Text("10 · 1000 m · 20 cal · 45s") }, modifier = Modifier.weight(1.3f))
+                OutlinedTextField(e.weight, { onChange(e.copy(weight = it)) }, label = { Text("Peso") }, singleLine = true, modifier = Modifier.weight(1f))
+                if (type == BlockType.SETS) {
+                    NumField("Desc. s", e.rest?.toString() ?: "", Modifier.weight(0.8f)) { onChange(e.copy(rest = it.toIntOrNull())) }
+                }
             }
             if (e.note.isNotBlank()) Text(e.note, style = MaterialTheme.typography.bodySmall)
         }
@@ -287,6 +429,7 @@ private fun SessionsScreen(store: Store) {
                     Text(DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(s.start)) +
                         " · ${s.activeS / 60} min · ${s.sets} series" + (if (s.hrAvg > 0) " · ♥ ${s.hrAvg}/${s.hrMax}" else "") +
                         (if (store.isSynced(s.start)) " · ✓ Health Connect" else ""), style = MaterialTheme.typography.bodySmall)
+                    s.blocks.forEach { b -> Text("▸ " + b.text(), fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium) }
                     s.exercises.forEach { e ->
                         val min = ((e.end - e.start) / 60000).toInt()
                         Text("• ${e.name}: ${e.detail()} · $min min" + (if (e.skipped) " (incompleto)" else ""),

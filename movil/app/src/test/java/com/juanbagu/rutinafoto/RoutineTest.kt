@@ -65,10 +65,28 @@ class SecurityTest {
     }
 
     @Test fun rutinaSeAcota() {
-        val r = Routine("  ", List(60) { Exercise("E$it", 99, rest = 5000) } + Exercise("   ", 3)).cleaned()
+        val r = Routine("  ", List(100) { Exercise("E$it", 99, rest = 5000, block = 7) } + Exercise("   ", 3)).cleaned()
         assertEquals("Rutina", r.name)
-        assertEquals(40, r.exercises.size)
+        assertEquals(80, r.exercises.size)
+        assertEquals(0, r.exercises[0].block) // bloque inexistente → el primero
         assertEquals(20, r.exercises[0].sets)
         assertEquals(900, r.exercises[0].rest)
+    }
+}
+
+class OfflineLayoutTest {
+    private fun row(top: Int, left: Int, text: String) = OfflineReader.Row(top, top + 40, left, text)
+
+    /** Columnas de una captura (meta a la izquierda, ejercicio a la derecha) y huecos grandes = bloques distintos. */
+    @Test fun ordenaColumnasYSeparaBloques() {
+        val text = OfflineReader.layoutRows(listOf(
+            row(100, 300, "wall balls 9kg"), row(102, 40, "20"),
+            row(0, 40, "4 rondas:"), row(50, 40, "1km run"),
+            row(260, 40, "AMRAP 12'"), row(310, 40, "10 burpees"),
+        ))
+        assertEquals("4 rondas:\n1km run\n20 wall balls 9kg\n\nAMRAP 12'\n10 burpees", text)
+        val r = RoutineParser.parse(text)
+        assertEquals(listOf(BlockType.ROUNDS, BlockType.AMRAP), r.blocks.map { it.type })
+        assertEquals(listOf("1000 m", "20", "10"), r.exercises.map { it.reps })
     }
 }

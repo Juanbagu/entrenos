@@ -15,6 +15,11 @@ Haz una foto de la pizarra del gimnasio (o comparte una captura) y tu Amazfit te
 | **arriba** | serie hecha (o saltar descanso) | siguiente ejercicio |
 | **abajo** | ver qué viene después | menú en pantalla: **Pausar/Continuar · Terminar · Volver** |
 
+- **Series por tiempo** (`45s`, `1min`): arriba arranca la cuenta atrás; vibra al acabar. Otra pulsación la termina antes.
+- **En el descanso** puedes tocar **−rep / +rep / −kg / +kg** para apuntar lo que de verdad hiciste en esa serie.
+- Deslizar hacia la derecha no saca de la sesión (para no salir sin querer).
+- Si el móvil no está a mano, el entreno se queda guardado y se reenvía solo.
+
 En el menú: arriba = pausar/continuar, abajo = volver. *Terminar* solo tocando la pantalla, para no terminar sin querer.
 Si los botones salen al revés, en la miniapp: **Botones** → pulsa el botón → **Invertir arriba/abajo**.
 
@@ -54,6 +59,13 @@ Press banca 3 x 12 @ 40 kg descanso 60
 Dominadas 3xmax
 Plancha 3x45s
 ```
+
+## Seguridad
+
+- La clave de la API se guarda **cifrada** con el Android Keystore y no entra en copias de seguridad ni transferencias.
+- El puente con el reloj solo escucha en `127.0.0.1` (no es accesible desde la red), limita tamaños y número de conexiones,
+  rechaza peticiones que vengan de una página web y valida cada entreno antes de guardarlo o escribirlo en Health Connect.
+- Las fotos se reducen antes de enviarlas a la IA y no se guardan.
 
 ## Pruebas
 

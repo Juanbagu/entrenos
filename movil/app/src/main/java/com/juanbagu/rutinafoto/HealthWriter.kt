@@ -41,22 +41,20 @@ class HealthWriter(private val ctx: Context) {
         val end = Instant.ofEpochMilli(s.end)
         val notes = buildString {
             s.exercises.forEach { e ->
-                append("• ").append(e.name).append(": ").append(e.sets).append('/').append(e.planned).append(" series")
-                if (e.reps.isNotBlank()) append(" × ").append(e.reps)
-                if (e.weight.isNotBlank()) append(" · ").append(e.weight)
+                append("• ").append(e.name).append(": ").append(e.detail())
                 if (e.hrAvg > 0) append(" · ♥").append(e.hrAvg)
                 if (e.skipped) append(" (incompleto)")
                 appendLine()
             }
             if (s.hrAvg > 0) append("Pulso medio ").append(s.hrAvg).append(", máximo ").append(s.hrMax)
-        }.trim()
+        }.trim().take(1000)
         return ExerciseSessionRecord(
             startTime = start,
             startZoneOffset = zone.rules.getOffset(start),
             endTime = end,
             endZoneOffset = zone.rules.getOffset(end),
             exerciseType = ExerciseSessionRecord.EXERCISE_TYPE_STRENGTH_TRAINING,
-            title = s.routine,
+            title = s.routine.take(100),
             notes = notes,
             metadata = Metadata.activelyRecorded(
                 device = Device(type = Device.TYPE_WATCH, manufacturer = "Amazfit", model = "Bip Max"),

@@ -18,12 +18,12 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import org.json.JSONObject
-import java.io.BufferedReader
-import java.io.InputStreamReader
+import java.io.BufferedInputStream
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.net.SocketException
+import java.util.concurrent.Semaphore
 
 /**
  * Servidor mínimo en 127.0.0.1:8765, solo accesible desde el propio móvil.
@@ -36,6 +36,7 @@ class LocalServer(
     private val onSessions: (List<Session>) -> Unit,
 ) {
     private var socket: ServerSocket? = null
+    private val slots = Semaphore(4) // como mucho 4 peticiones a la vez
 
     fun start(scope: CoroutineScope) {
         if (socket != null) return
@@ -44,7 +45,13 @@ class LocalServer(
         scope.launch(Dispatchers.IO) {
             while (!ss.isClosed) {
                 val c = try { ss.accept() } catch (e: SocketException) { break }
-                launch(Dispatchers.IO) { runCatching { handle(c) }.onFailure { Log.w(TAG, "petición", it) } }
+                if (!c.inetAddress.isLoopbackAddress || !slots.tryAcquire()) {
+                    runCatching { c.close() }
+                    continue
+                }
+                launch(Dispatchers.IO) {
+                    try { handle(c) } catch (e: Exception) { Log.w(TAG, "petición rechazada: ${e.message}") } finally { slots.release() }
+                }
             }
         }
     }
@@ -56,34 +63,57 @@ class LocalServer(
 
     private fun handle(c: Socket) = c.use {
         c.soTimeout = 5000
-        val reader = BufferedReader(InputStreamReader(c.getInputStream(), Charsets.UTF_8))
-        val requestLine = reader.readLine() ?: return
-        val (method, path) = requestLine.split(" ").let { (it.getOrNull(0) ?: "") to (it.getOrNull(1) ?: "") }
-        var length = 0
+        val input = BufferedInputStream(c.getInputStream())
+        val requestLine = readLine(input) ?: return
+        val parts = requestLine.split(" ")
+        val method = parts.getOrNull(0) ?: ""
+        val path = (parts.getOrNull(1) ?: "").substringBefore('?')
+        val headers = mutableMapOf<String, String>()
+        var count = 0
         while (true) {
-            val h = reader.readLine() ?: break
+            val h = readLine(input) ?: return
             if (h.isEmpty()) break
-            if (h.startsWith("content-length:", ignoreCase = true)) length = h.substringAfter(':').trim().toIntOrNull() ?: 0
+            if (++count > MAX_HEADERS) error("demasiadas cabeceras")
+            val i = h.indexOf(':')
+            if (i > 0) headers[h.substring(0, i).trim().lowercase()] = h.substring(i + 1).trim()
         }
-        val body = if (length > 0) CharArray(length).let { buf ->
-            var read = 0
-            while (read < length) {
-                val n = reader.read(buf, read, length - read)
-                if (n < 0) break
-                read += n
+        val length = headers["content-length"]?.toIntOrNull() ?: 0
+        val (status, json) = when {
+            length !in 0..MAX_BODY -> "413 Payload Too Large" to """{"error":"demasiado grande"}"""
+            fromBrowser(headers) -> "403 Forbidden" to """{"error":"no permitido"}"""
+            method == "POST" && headers["content-type"]?.startsWith("application/json") != true ->
+                "415 Unsupported Media Type" to """{"error":"solo JSON"}"""
+            else -> {
+                val body = ByteArray(length)
+                var read = 0
+                while (read < length) {
+                    val n = input.read(body, read, length - read)
+                    if (n < 0) break
+                    read += n
+                }
+                route(method, path, String(body, 0, read, Charsets.UTF_8))
             }
-            String(buf, 0, read)
-        } else ""
-
-        val (status, json) = route(method, path.substringBefore('?'), body)
+        }
         val bytes = json.toByteArray(Charsets.UTF_8)
         val out = c.getOutputStream()
         out.write(
             ("HTTP/1.1 $status\r\nContent-Type: application/json; charset=utf-8\r\n" +
-                "Content-Length: ${bytes.size}\r\nConnection: close\r\n\r\n").toByteArray()
+                "Content-Length: ${bytes.size}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n").toByteArray()
         )
         out.write(bytes)
         out.flush()
+    }
+
+    /** Lee una línea HTTP (hasta CRLF) con un tope de tamaño. */
+    private fun readLine(input: BufferedInputStream): String? {
+        val buf = java.io.ByteArrayOutputStream()
+        while (true) {
+            val b = input.read()
+            if (b < 0) return if (buf.size() == 0) null else buf.toString("UTF-8")
+            if (b == '\n'.code) return buf.toString("UTF-8").trimEnd('\r')
+            if (buf.size() >= MAX_LINE) error("línea demasiado larga")
+            buf.write(b)
+        }
     }
 
     /** Separado del socket para poder probarlo. */
@@ -94,11 +124,14 @@ class LocalServer(
             else "200 OK" to r.toJson().toString()
         }
         method == "POST" && path == "/sessions" -> {
-            val arr = JSONObject(body.ifBlank { "{}" }).optJSONArray("sessions")
-            val list = if (arr == null) emptyList() else (0 until arr.length()).map { arr.getJSONObject(it) }
-            val added = store.addSessions(list)
-            if (added.isNotEmpty()) onSessions(added)
-            "200 OK" to """{"ok":true,"added":${added.size}}"""
+            val arr = runCatching { JSONObject(body).optJSONArray("sessions") }.getOrNull()
+            if (arr == null) "400 Bad Request" to """{"error":"JSON no válido"}"""
+            else {
+                val list = (0 until minOf(arr.length(), 50)).mapNotNull { arr.optJSONObject(it) }
+                val added = store.addSessions(list)
+                if (added.isNotEmpty()) onSessions(added)
+                "200 OK" to """{"ok":true,"added":${added.size}}"""
+            }
         }
         method == "GET" && path == "/ping" -> "200 OK" to """{"ok":true}"""
         else -> "404 Not Found" to """{"error":"no existe"}"""
@@ -107,6 +140,15 @@ class LocalServer(
     companion object {
         const val PORT = 8765
         private const val TAG = "RutinaFoto"
+        private const val MAX_BODY = 512 * 1024
+        private const val MAX_LINE = 8 * 1024
+        private const val MAX_HEADERS = 50
+
+        /** Una web abierta en el navegador del móvil podría intentar escribir en 127.0.0.1: se rechaza. */
+        fun fromBrowser(headers: Map<String, String>): Boolean {
+            val origin = headers["origin"] ?: headers["referer"] ?: return false
+            return origin.startsWith("http://", true) || origin.startsWith("https://", true)
+        }
     }
 }
 

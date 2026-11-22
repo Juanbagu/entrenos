@@ -13,9 +13,10 @@
 
     <application
         android:label="Rutina Foto"
-        android:icon="@android:drawable/ic_menu_camera"
+        android:icon="@drawable/ic_launcher"
         android:theme="@android:style/Theme.Material.NoActionBar"
-        android:allowBackup="false">
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules">
 
         <activity
             android:name=".MainActivity"

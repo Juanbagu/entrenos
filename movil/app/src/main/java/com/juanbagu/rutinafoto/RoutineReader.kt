@@ -9,6 +9,12 @@ import android.util.Base64
 import androidx.exifinterface.media.ExifInterface
 import com.anthropic.client.okhttp.AnthropicOkHttpClient
 import com.anthropic.core.JsonValue
+import com.anthropic.errors.AnthropicIoException
+import com.anthropic.errors.AnthropicServiceException
+import com.anthropic.errors.BadRequestException
+import com.anthropic.errors.PermissionDeniedException
+import com.anthropic.errors.RateLimitException
+import com.anthropic.errors.UnauthorizedException
 import com.anthropic.models.messages.Base64ImageSource
 import com.anthropic.models.messages.ContentBlockParam
 import com.anthropic.models.messages.ImageBlockParam
@@ -80,7 +86,21 @@ object RoutineReader {
                 )
                 .build()
 
-            val msg = client.messages().create(params)
+            val msg = try {
+                client.messages().create(params)
+            } catch (e: UnauthorizedException) {
+                error("La clave de la API no es válida. Revísala en Ajustes.")
+            } catch (e: PermissionDeniedException) {
+                error("Tu clave no tiene permiso para este modelo.")
+            } catch (e: RateLimitException) {
+                error("Demasiadas peticiones seguidas. Espera un minuto y vuelve a probar.")
+            } catch (e: BadRequestException) {
+                error("La API rechazó la petición (¿sin saldo o imagen no válida?).")
+            } catch (e: AnthropicServiceException) {
+                error("El servicio de IA ha fallado (${e.statusCode()}). Prueba otra vez.")
+            } catch (e: AnthropicIoException) {
+                error("Sin conexión a internet.")
+            }
             val stop = msg.stopReason().orElse(null)
             if (stop == StopReason.REFUSAL) error("La IA no ha podido leer esta imagen. Prueba con otra foto.")
             if (stop == StopReason.MAX_TOKENS) error("La respuesta se cortó. Prueba con una foto de menos ejercicios.")
@@ -94,7 +114,7 @@ object RoutineReader {
     /** Convierte la respuesta JSON del modelo en rutina. Público para las pruebas. */
     fun parse(text: String): Result {
         val o = JSONObject(text)
-        val r = Routine.fromJson(o)
+        val r = Routine.fromJson(o).cleaned()
         require(r.exercises.isNotEmpty()) { "No he encontrado ejercicios en la foto" }
         val w = o.optJSONArray("warnings")
         val warnings = if (w == null) emptyList() else (0 until w.length()).map { w.getString(it) }.filter { it.isNotBlank() }
@@ -137,6 +157,7 @@ object RoutineReader {
         val cr = ctx.contentResolver
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         cr.openInputStream(uri).use { BitmapFactory.decodeStream(it, null, bounds) }
+        require(bounds.outWidth > 0 && bounds.outHeight > 0) { "Eso no parece una imagen" }
         var sample = 1
         while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= 1568) sample *= 2
         val bmp0 = cr.openInputStream(uri).use {

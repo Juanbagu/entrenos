@@ -114,3 +114,50 @@ test('el reloj entiende lo que genera la app del móvil (JSON y texto)', () => {
   assert.deepEqual(t.exercises[0], { name: 'Sentadilla', sets: 4, reps: '10', weight: '60 kg', rest: 90 })
   assert.deepEqual(t.exercises[1], { name: 'Prensa', sets: 3, reps: '12', rest: 90 })
 })
+
+test('serie por tiempo: arriba arranca la cuenta atrás y al acabar vibra y pasa a descanso', () => {
+  let s = R.startSession({ name: 'Core', exercises: [{ name: 'Plancha', sets: 2, reps: '45s', rest: 30 }] }, 0)
+  assert.equal(s.routine.exercises[0].timedS, 45)
+  s = R.primary(s, 1000)
+  assert.equal(s.phase, R.PHASE.TIMER)
+  assert.equal(R.timerLeftS(s, 11000), 35)
+  s = R.pause(s, 11000)
+  s = R.resume(s, 21000) // 10 s de pausa no cuentan
+  assert.equal(R.tick(s, 46000).timerEnded, false)
+  const t = R.tick(s, 56000)
+  assert.equal(t.timerEnded, true)
+  assert.equal(t.state.phase, R.PHASE.REST)
+  assert.equal(t.state.log.length, 1)
+})
+
+test('serie por tiempo: pulsar otra vez la termina antes', () => {
+  let s = R.startSession({ name: 'Core', exercises: [{ name: 'Plancha', sets: 1, reps: '1min' }] }, 0)
+  assert.equal(s.routine.exercises[0].timedS, 60)
+  s = R.primary(R.primary(s, 0), 20000)
+  assert.equal(s.phase, R.PHASE.DONE)
+})
+
+test('corregir reps y peso de la última serie durante el descanso', () => {
+  let s = R.startSession(rutina, 0)
+  s = R.primary(s, 1000)
+  s = R.adjustLast(s, 'reps', -2)
+  s = R.adjustLast(s, 'weight', +1)
+  assert.deepEqual(R.lastSet(s), { ex: 0, set: 0, at: 1000, reps: '8', weight: '62,5 kg' })
+  s = R.adjustLast(s, 'weight', +1)
+  assert.equal(R.lastSet(s).weight, '65 kg')
+  const sinPeso = R.adjustLast(R.primary(R.startSession({ name: 'x', exercises: [{ name: 'Dominadas', sets: 2, reps: 'max' }] }, 0), 1), 'reps', 1)
+  assert.equal(R.lastSet(sinPeso).reps, '1')
+  s = R.finish(s, 9000)
+  assert.deepEqual(R.summary(s).exercises[0].done, [{ reps: '8', weight: '65 kg' }])
+})
+
+test('límites: rutinas enormes o valores absurdos se recortan', () => {
+  const big = { name: 'x'.repeat(200), exercises: Array.from({ length: 100 }, (_, i) => ({ name: 'E' + i, sets: 999, rest: -5 })) }
+  const n = R.normalizeRoutine(big)
+  assert.equal(n.exercises.length, R.LIMITS.exercises)
+  assert.equal(n.exercises[0].sets, R.LIMITS.sets)
+  assert.equal(n.exercises[0].rest, 0)
+  assert.equal(n.name.length, R.LIMITS.name)
+  assert.throws(() => R.normalizeRoutine({ exercises: [] }))
+  assert.throws(() => R.normalizeRoutine(null))
+})

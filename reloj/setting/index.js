@@ -24,10 +24,14 @@ AppSettingsPage({
 
     let sessions = []
     try { sessions = JSON.parse(st.getItem('sessions') || '[]') } catch (e) {}
+    if (!Array.isArray(sessions)) sessions = []
+    let outbox = []
+    try { outbox = JSON.parse(st.getItem('outbox') || '[]') } catch (e) {}
     const last = sessions.slice(-5).reverse().map((x) => {
       const d = new Date(x.start)
-      const min = Math.round(x.activeS / 60)
-      return d.toLocaleDateString() + ' · ' + x.routine + ' · ' + min + ' min · ' + x.sets + ' series' + (x.hrAvg ? ' · ♥' + x.hrAvg : '')
+      const min = Math.round((x.activeS || 0) / 60)
+      const fecha = d.getDate() + '/' + (d.getMonth() + 1) + ' ' + d.getHours() + ':' + String(d.getMinutes()).padStart(2, '0')
+      return fecha + ' · ' + x.routine + ' · ' + min + ' min · ' + x.sets + ' series' + (x.hrAvg ? ' · ♥' + x.hrAvg : '')
     })
 
     const card = { background: '#fff', borderRadius: '12px', padding: '12px', margin: '8px 0' }
@@ -52,7 +56,8 @@ AppSettingsPage({
       View({ style: card }, [
         Text({ bold: true, paragraph: true }, 'Últimos entrenos'),
         Text({ paragraph: true, style: { whiteSpace: 'pre-line', fontSize: '14px', color: '#374151' } },
-          last.length ? last.join('\n') : 'Aún no hay entrenos.'),
+          (last.length ? last.join('\n') : 'Aún no hay entrenos.') +
+          (Array.isArray(outbox) && outbox.length ? '\n\n' + outbox.length + ' pendiente(s) de pasar a la app del móvil.' : '')),
       ]),
     ])
   },

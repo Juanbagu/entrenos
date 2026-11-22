@@ -12,7 +12,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -101,7 +103,9 @@ private fun App(sharedImage: MutableStateFlow<Uri?>) {
 private fun RoutineScreen(store: Store, sharedImage: MutableStateFlow<Uri?>) {
     val ctx = LocalContext.current
     val scope = (ctx as ComponentActivity).lifecycleScope
-    var routine by remember { mutableStateOf(store.routine) }
+    var routine by remember { mutableStateOf(store.draft) }
+    var recent by remember { mutableStateOf(store.recent()) }
+    LaunchedEffect(routine) { store.draft = routine }
     var warnings by remember { mutableStateOf<List<String>>(emptyList()) }
     var busy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
@@ -127,9 +131,18 @@ private fun RoutineScreen(store: Store, sharedImage: MutableStateFlow<Uri?>) {
     val notifPerm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
     fun sendToWatch() {
-        val r = routine ?: return
+        val r = routine?.cleaned() ?: return
+        if (r.exercises.isEmpty()) {
+            message = "Añade al menos un ejercicio con nombre."
+            return
+        }
+        routine = r
         store.routine = r
-        if (Build.VERSION.SDK_INT >= 33) notifPerm.launch(Manifest.permission.POST_NOTIFICATIONS)
+        store.remember(r)
+        recent = store.recent()
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ctx.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) notifPerm.launch(Manifest.permission.POST_NOTIFICATIONS)
         BridgeService.start(ctx)
         message = "Lista. En el reloj abre Rutina Foto y pulsa «Recibir del móvil» (con la app Zepp abierta en segundo plano)."
     }
@@ -154,6 +167,15 @@ private fun RoutineScreen(store: Store, sharedImage: MutableStateFlow<Uri?>) {
                 CircularProgressIndicator(Modifier.size(24.dp)); Spacer(Modifier.width(12.dp)); Text("Leyendo la foto…")
             }
             message?.let { Text(it, modifier = Modifier.padding(top = 8.dp), color = MaterialTheme.colorScheme.primary) }
+            if (recent.isNotEmpty()) {
+                Text("Recientes", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 10.dp))
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    recent.forEach { rr ->
+                        AssistChip(onClick = { routine = rr; warnings = emptyList(); message = "Cargada «${rr.name}». Revisa y envía." },
+                            label = { Text(rr.name, maxLines = 1) })
+                    }
+                }
+            }
             if (warnings.isNotEmpty()) Card(Modifier.fillMaxWidth().padding(top = 8.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)) {
                 Column(Modifier.padding(12.dp)) {
                     Text("Revisa esto:", fontWeight = FontWeight.Bold)
@@ -226,7 +248,8 @@ private fun SessionsScreen(store: Store) {
     val ctx = LocalContext.current
     val scope = (ctx as ComponentActivity).lifecycleScope
     val last by BridgeService.lastReceived.collectAsState()
-    val sessions = remember(last) { store.sessions() }
+    var refresh by remember { mutableStateOf(0) }
+    val sessions = remember(last, refresh) { store.sessions() }
     val hw = remember { HealthWriter(ctx) }
     var hcOk by remember { mutableStateOf(false) }
     var info by remember { mutableStateOf<String?>(null) }
@@ -240,7 +263,15 @@ private fun SessionsScreen(store: Store) {
             Spacer(Modifier.height(12.dp))
             Text("Entrenos", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             when {
-                !hw.available() -> Text("Health Connect no está disponible en este móvil.")
+                !hw.available() -> Column {
+                    Text("Para guardar los entrenos en Health Connect hay que instalarlo o actualizarlo.")
+                    OutlinedButton(onClick = {
+                        runCatching {
+                            ctx.startActivity(Intent(Intent.ACTION_VIEW,
+                                Uri.parse("market://details?id=com.google.android.apps.healthdata")))
+                        }
+                    }) { Text("Abrir Google Play") }
+                }
                 !hcOk -> Button(onClick = { askHc.launch(HealthWriter.PERMISSIONS) }) { Text("Permitir guardar en Health Connect") }
                 else -> OutlinedButton(onClick = {
                     scope.launch { info = "Guardados en Health Connect: " + hw.writeAll(store.sessions(), store) }
@@ -258,9 +289,13 @@ private fun SessionsScreen(store: Store) {
                         (if (store.isSynced(s.start)) " · ✓ Health Connect" else ""), style = MaterialTheme.typography.bodySmall)
                     s.exercises.forEach { e ->
                         val min = ((e.end - e.start) / 60000).toInt()
-                        Text("• ${e.name}: ${e.sets}/${e.planned} series · $min min" + (if (e.skipped) " (incompleto)" else ""),
+                        Text("• ${e.name}: ${e.detail()} · $min min" + (if (e.skipped) " (incompleto)" else ""),
                             style = MaterialTheme.typography.bodyMedium)
                     }
+                    var confirm by remember { mutableStateOf(false) }
+                    TextButton(onClick = {
+                        if (confirm) { store.deleteSession(s.start); refresh++ } else confirm = true
+                    }) { Text(if (confirm) "Pulsa otra vez para borrar" else "Borrar") }
                 }
             }
         }

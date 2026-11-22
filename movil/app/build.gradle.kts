@@ -11,8 +11,10 @@ android {
         applicationId = "com.juanbagu.rutinafoto"
         minSdk = 28
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
+        // Móviles Android actuales (64 bits): evita meter el modelo de lectura para todos los procesadores.
+        ndk { abiFilters += listOf("arm64-v8a") }
     }
     buildTypes {
         release { isMinifyEnabled = false }

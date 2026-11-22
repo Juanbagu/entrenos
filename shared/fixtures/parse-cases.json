@@ -1,0 +1,326 @@
+[
+  {
+    "case": "fuerza clásica",
+    "text": "Pierna lunes\n1. Sentadilla 4x10 60kg 90s\n- Press banca 3 x 12 @ 40 kg descanso 60\nDominadas 3xmax\nPlancha 3x45s\nPeso muerto 4×8-10 80 kg 2min",
+    "name": "Pierna lunes",
+    "blocks": [
+      {
+        "type": "sets"
+      }
+    ],
+    "exercises": [
+      {
+        "name": "Sentadilla",
+        "sets": 4,
+        "reps": "10",
+        "weight": "60 kg",
+        "rest": 90,
+        "block": 0
+      },
+      {
+        "name": "Press banca",
+        "sets": 3,
+        "reps": "12",
+        "weight": "40 kg",
+        "rest": 60,
+        "block": 0
+      },
+      {
+        "name": "Dominadas",
+        "sets": 3,
+        "reps": "max",
+        "block": 0
+      },
+      {
+        "name": "Plancha",
+        "sets": 3,
+        "reps": "45s",
+        "block": 0
+      },
+      {
+        "name": "Peso muerto",
+        "sets": 4,
+        "reps": "8-10",
+        "weight": "80 kg",
+        "rest": 120,
+        "block": 0
+      }
+    ]
+  },
+  {
+    "case": "simulación Hyrox",
+    "text": "HYROX SIM\n1km run\n1000m SkiErg\n1km run\n50m sled push @ 152kg\n1km run\n50m sled pull 103kg\n1km run\n80m BBJ\n1km run\n1000m row\n1km run\n200m farmers carry 2x24kg\n1km run\n100m SBL 20kg\n1km run\n100 wall balls 6/4kg",
+    "name": "Hyrox sim",
+    "blocks": [
+      {
+        "type": "fortime"
+      }
+    ],
+    "exercises": [
+      {
+        "name": "Carrera",
+        "reps": "1000 m",
+        "block": 0
+      },
+      {
+        "name": "SkiErg",
+        "reps": "1000 m",
+        "block": 0
+      },
+      {
+        "name": "Carrera",
+        "reps": "1000 m",
+        "block": 0
+      },
+      {
+        "name": "sled push",
+        "reps": "50 m",
+        "weight": "152 kg",
+        "block": 0
+      },
+      {
+        "name": "Carrera",
+        "reps": "1000 m",
+        "block": 0
+      },
+      {
+        "name": "sled pull",
+        "reps": "50 m",
+        "weight": "103 kg",
+        "block": 0
+      },
+      {
+        "name": "Carrera",
+        "reps": "1000 m",
+        "block": 0
+      },
+      {
+        "name": "Burpee broad jumps",
+        "reps": "80 m",
+        "block": 0
+      },
+      {
+        "name": "Carrera",
+        "reps": "1000 m",
+        "block": 0
+      },
+      {
+        "name": "Remo",
+        "reps": "1000 m",
+        "block": 0
+      },
+      {
+        "name": "Carrera",
+        "reps": "1000 m",
+        "block": 0
+      },
+      {
+        "name": "farmers carry",
+        "reps": "200 m",
+        "weight": "2×24 kg",
+        "block": 0
+      },
+      {
+        "name": "Carrera",
+        "reps": "1000 m",
+        "block": 0
+      },
+      {
+        "name": "Sandbag lunges",
+        "reps": "100 m",
+        "weight": "20 kg",
+        "block": 0
+      },
+      {
+        "name": "Carrera",
+        "reps": "1000 m",
+        "block": 0
+      },
+      {
+        "name": "wall balls",
+        "reps": "100",
+        "weight": "6/4 kg",
+        "block": 0
+      }
+    ]
+  },
+  {
+    "case": "híbrido con bloques",
+    "text": "Fuerza\nBack squat 5x5 100kg 2'\n\n4 rondas:\n1km run\n20 wall balls 9kg\n15 cal bike\nDescanso 1'\n\nAMRAP 12'\n10 burpees\n12 cal row\n6 pull ups\n\nEMOM 10\n12 KB swings 24kg\n200m ski",
+    "name": "Fuerza",
+    "blocks": [
+      {
+        "type": "sets"
+      },
+      {
+        "type": "rounds",
+        "rounds": 4,
+        "restS": 60
+      },
+      {
+        "type": "amrap",
+        "capS": 720
+      },
+      {
+        "type": "emom",
+        "everyS": 60,
+        "capS": 600
+      }
+    ],
+    "exercises": [
+      {
+        "name": "Back squat",
+        "sets": 5,
+        "reps": "5",
+        "weight": "100 kg",
+        "rest": 120,
+        "block": 0
+      },
+      {
+        "name": "Carrera",
+        "reps": "1000 m",
+        "block": 1
+      },
+      {
+        "name": "wall balls",
+        "reps": "20",
+        "weight": "9 kg",
+        "block": 1
+      },
+      {
+        "name": "Bike",
+        "reps": "15 cal",
+        "block": 1
+      },
+      {
+        "name": "burpees",
+        "reps": "10",
+        "block": 2
+      },
+      {
+        "name": "Remo",
+        "reps": "12 cal",
+        "block": 2
+      },
+      {
+        "name": "pull ups",
+        "reps": "6",
+        "block": 2
+      },
+      {
+        "name": "KB swings",
+        "reps": "12",
+        "weight": "24 kg",
+        "block": 3
+      },
+      {
+        "name": "SkiErg",
+        "reps": "200 m",
+        "block": 3
+      }
+    ]
+  },
+  {
+    "case": "21-15-9 y time cap",
+    "text": "Metcon\n21-15-9:\nThrusters 43kg\nPull-ups\nTime cap 10'",
+    "name": "Metcon",
+    "blocks": [
+      {
+        "type": "fortime",
+        "rounds": 3,
+        "capS": 600
+      }
+    ],
+    "exercises": [
+      {
+        "name": "Thrusters",
+        "reps": "",
+        "weight": "43 kg",
+        "block": 0
+      },
+      {
+        "name": "Pull-ups",
+        "reps": "",
+        "block": 0
+      }
+    ]
+  },
+  {
+    "case": "rondas en una línea y E2MOM",
+    "text": "5 RFT: 400m run + 15 T2B + 10 DB snatch 22.5kg\n\nE2MOM 16: 8 power cleans 70kg",
+    "name": "Híbrido",
+    "blocks": [
+      {
+        "type": "fortime",
+        "rounds": 5
+      },
+      {
+        "type": "emom",
+        "everyS": 120,
+        "capS": 960
+      }
+    ],
+    "exercises": [
+      {
+        "name": "Carrera",
+        "reps": "400 m",
+        "block": 0
+      },
+      {
+        "name": "Toes to bar",
+        "reps": "15",
+        "block": 0
+      },
+      {
+        "name": "DB snatch",
+        "reps": "10",
+        "weight": "22,5 kg",
+        "block": 0
+      },
+      {
+        "name": "power cleans",
+        "reps": "8",
+        "weight": "70 kg",
+        "block": 1
+      }
+    ]
+  },
+  {
+    "case": "cada 3 minutos y metas por tiempo",
+    "text": "Cada 3' x 5\n500m row\nmax burpees\n\nCore\nPlancha 1:00\n2' hollow hold",
+    "name": "Híbrido",
+    "blocks": [
+      {
+        "type": "emom",
+        "everyS": 180,
+        "capS": 900
+      },
+      {
+        "type": "sets",
+        "name": "Core"
+      }
+    ],
+    "exercises": [
+      {
+        "name": "Remo",
+        "reps": "500 m",
+        "block": 0
+      },
+      {
+        "name": "burpees",
+        "reps": "max",
+        "block": 0
+      },
+      {
+        "name": "Plancha",
+        "reps": "60s",
+        "block": 1
+      },
+      {
+        "name": "hollow hold",
+        "reps": "120s",
+        "block": 1
+      }
+    ]
+  }
+]

@@ -1,8 +1,9 @@
 // Ajustes de la miniapp dentro de la app Zepp (móvil).
 // Opción sin app propia: pegar aquí la rutina como texto, una línea por ejercicio.
 import { parseRoutine } from '../shared/parse'
+import { normalizeRoutine, previewLines } from '../shared/routine'
 
-const EJEMPLO = 'Pierna lunes\nSentadilla 4x10 60kg 90s\nPrensa 3x12 120kg 60s\nZancadas 3x10 descanso 60\nPlancha 3x45s'
+const EJEMPLO = 'Híbrido\nBack squat 5x5 100kg 2\'\n\n4 rondas:\n1km run\n20 wall balls 9kg\n15 cal bike\n\nAMRAP 12\'\n10 burpees\n12 cal row'
 
 AppSettingsPage({
   build(props) {
@@ -12,11 +13,9 @@ AppSettingsPage({
     let ok = false
     if (raw) {
       try {
-        const r = parseRoutine(raw)
+        const r = normalizeRoutine(parseRoutine(raw))
         ok = true
-        preview = r.name + ' · ' + r.exercises.length + ' ejercicios\n' +
-          r.exercises.map((e) => '• ' + e.name + ': ' + e.sets + '×' + (e.reps || '—') +
-            (e.weight ? ' · ' + e.weight : '') + (e.rest !== undefined ? ' · ' + e.rest + 's' : '')).join('\n')
+        preview = r.name + '\n' + previewLines(r).join('\n')
       } catch (e) {
         preview = '⚠ ' + e.message
       }

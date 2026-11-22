@@ -5,7 +5,7 @@ import { showToast } from '@zos/interaction'
 import { setStatusBarVisible } from '@zos/ui'
 import { W, H, M, C, s, text, button, setText } from '../shared/ui'
 import { store, DEMO } from '../shared/store'
-import { normalizeRoutine, describe, PHASE } from '../shared/routine'
+import { normalizeRoutine, previewLines, PHASE } from '../shared/routine'
 import { listenKeys, stopKeys } from '../shared/keys'
 
 function activeSession() {
@@ -61,8 +61,9 @@ Page(
         return
       }
       setText(this.name, r.name)
-      const lines = r.exercises.slice(0, 4).map((e) => '• ' + e.name + '  ' + describe(e))
-      if (r.exercises.length > 4) lines.push('… y ' + (r.exercises.length - 4) + ' más')
+      const all = previewLines(r)
+      const lines = all.slice(0, 5)
+      if (all.length > 5) lines.push('… y ' + (all.length - 5) + ' líneas más')
       setText(this.list, lines.join('\n'))
     },
 

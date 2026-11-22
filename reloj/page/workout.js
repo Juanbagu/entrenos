@@ -52,9 +52,9 @@ Page(
       const y0 = s(18)
       this.clock = text({ x: M, y: y0, w: (W - 2 * M) / 2, h: s(40), size: s(26), color: C.dim, left: true })
       this.hr = text({ x: W / 2, y: y0, w: W / 2 - M, h: s(40), size: s(26), color: C.danger, right: true })
-      this.counter = text({ y: y0 + s(44), h: s(32), size: s(22), color: C.dim })
+      this.counter = text({ y: y0 + s(44), h: s(32), size: s(20), color: C.dim })
       this.exName = text({ y: y0 + s(80), h: s(120), size: s(44), wrap: true })
-      this.big = text({ y: y0 + s(204), h: s(110), size: s(92), color: C.work })
+      this.big = text({ y: y0 + s(204), h: s(110), size: s(72), color: C.work })
       this.detail = text({ y: y0 + s(314), h: s(44), size: s(30) })
       this.next = text({ y: H - s(110), h: s(80), size: s(24), color: C.dim, wrap: true })
 
@@ -134,6 +134,9 @@ Page(
       }
       if (side === 'top' && kind === 'short') {
         const next = R.primary(st, now)
+        if (JSON.stringify(next) === JSON.stringify(st)) {
+          return true // no ha cambiado nada (p. ej. esperando al minuto del EMOM)
+        }
         this.update(next)
         if (next.exIdx !== st.exIdx) this.buzz(VIBRATOR_SCENE_DURATION)
         else this.buzz(VIBRATOR_SCENE_SHORT_STRONG)
@@ -150,9 +153,12 @@ Page(
     onTick() {
       if (!this.state.st || this.finished) return
       const t = R.tick(this.state.st, Date.now())
-      if (t.restEnded || t.timerEnded) {
+      if (t.blockEnded) {
         this.update(t.state)
         this.buzz(VIBRATOR_SCENE_STRONG_REMINDER)
+      } else if (t.restEnded || t.timerEnded || t.intervalEnded) {
+        this.update(t.state)
+        this.buzz(t.intervalEnded ? VIBRATOR_SCENE_DURATION : VIBRATOR_SCENE_STRONG_REMINDER)
       } else {
         if (Date.now() - this.state.savedAt > SAVE_EVERY_MS) this.save() // guarda también el pulso
         this.render()
@@ -186,29 +192,42 @@ Page(
       const now = Date.now()
       const ex = st.routine.exercises[st.exIdx]
       setText(this.clock, R.fmtTime(R.elapsedS(st, now)))
-      setText(this.counter, 'Ejercicio ' + (st.exIdx + 1) + ' de ' + st.routine.exercises.length)
+      setText(this.counter, R.blockLabel(st, now) || 'Ejercicio ' + (st.exIdx + 1) + ' de ' + st.routine.exercises.length)
       setText(this.exName, ex.name)
 
       const peek = now < this.state.peekUntil
       let showAdjust = false
-      if (st.paused) {
+      const emomWait = st.phase === R.PHASE.REST && st.blk && st.blk.unitDone
+      if (R.waitingStart(st) && !st.paused) {
+        setText(this.big, '¡Listo!')
+        setColor(this.big, C.work)
+        setText(this.detail, 'Arriba: empezar ' + R.blockOf(st).name)
+      } else if (st.paused) {
         setText(this.big, 'PAUSA')
         setColor(this.big, C.pause)
         setText(this.detail, 'Arriba: continuar')
       } else if (st.phase === R.PHASE.REST) {
         setText(this.big, R.fmtTime(R.restLeftS(st, now)))
         setColor(this.big, C.rest)
-        setText(this.detail, 'Descanso · luego serie ' + (st.setIdx + 1) + '/' + ex.sets)
-        showAdjust = !peek
+        setText(this.detail, emomWait ? 'Hecho ✓ · espera al minuto'
+          : st.setIdx > 0 ? 'Descanso · luego serie ' + (st.setIdx + 1) + '/' + ex.sets : 'Descanso')
+        showAdjust = !peek && !!R.lastSet(st)
       } else if (st.phase === R.PHASE.TIMER) {
         setText(this.big, R.fmtTime(R.timerLeftS(st, now)))
         setColor(this.big, C.work)
         setText(this.detail, 'Serie ' + (st.setIdx + 1) + '/' + ex.sets + ' · arriba: terminar')
       } else {
-        setText(this.big, 'Serie ' + (st.setIdx + 1) + '/' + ex.sets)
         setColor(this.big, C.work)
-        const what = ex.timedS ? ex.reps + ' · arriba: empezar' : (ex.reps ? ex.reps + ' reps' : '')
-        setText(this.detail, what + (ex.weight ? ' · ' + ex.weight : ''))
+        const w = ex.weight ? ' · ' + ex.weight : ''
+        if (ex.sets > 1) {
+          setText(this.big, 'Serie ' + (st.setIdx + 1) + '/' + ex.sets)
+          setText(this.detail, (ex.timedS ? R.targetText(ex) + ' · arriba: empezar' : R.targetText(ex)) + w)
+        } else {
+          // Una sola serie (híbrido): la meta en grande, "1000 m", "20 cal", "15".
+          setText(this.big, R.targetShort(ex))
+          const unit = /^\d+(?:-\d+)*$/.test(ex.reps) ? 'reps' : ''
+          setText(this.detail, (ex.timedS ? 'arriba: empezar' : unit) + w || 'arriba: hecho')
+        }
       }
 
       this.adjWidgets.forEach((w) => show(w, showAdjust))
